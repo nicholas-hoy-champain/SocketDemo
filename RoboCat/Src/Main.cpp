@@ -67,7 +67,7 @@ int main(int argc, const char** argv)
 	SocketAddressPtr addressToSendTo;
 	SocketAddressPtr addressRecievedFrom;
 
-	vector<std::pair<int, void*>> unprocessedData = vector<std::pair<int, void*>>();
+	vector<std::pair<int, void*>>* unprocessedData =  new vector<std::pair<int, void*>>();
 
 	//--------------------- intialization window -------------------------------
 
@@ -110,7 +110,7 @@ int main(int argc, const char** argv)
 		{
 			Sleep(500); // wait 0.5 second
 			std::cout << '.';
-		} while (unprocessedData.size() < 1);
+		} while (unprocessedData->size() < 1);
 
 		std::cout << "\n Recieved an offer to start the game, now sending the reply to start their game.\n";
 		NetworkManager::SetUpSending(JOINER_PORT, CREATOR_PORT + 10, sendingSocket, addressToSendTo);
@@ -136,16 +136,16 @@ int main(int argc, const char** argv)
 		NetworkManager::SetUpInitialListening(listeningPort, listeningSocket, listeningAddress);
 
 		addressRecievedFrom = SocketAddressFactory::CreateIPv4FromString((NetworkManager::ACCEPT_ALL_ADDRESS + std::to_string( JOINER_PORT + 5)));
-		listeningThread = std::thread(NetworkManager::HandleListening, std::ref(connectionsOpen), listeningSocket, addressRecievedFrom, std::ref(unprocessedData));
+		listeningThread = std::thread(NetworkManager::HandleListening, std::ref(connectionsOpen), listeningSocket, addressRecievedFrom, unprocessedData);
 		do
 		{
 			Sleep(500); // wait 0.5 second
 			std::cout << '.';
-		} while (unprocessedData.size() < 1);
+		} while (unprocessedData->size() < 1);
 	}
 
 	// we don't need the starting messages stored
-	unprocessedData.clear();
+	unprocessedData->clear();
 
 	//  Graphics init
 	GraphicsLibrary gl(SCREEN_X, SCREEN_Y);
@@ -181,7 +181,7 @@ int main(int argc, const char** argv)
 
 		if (userIsCreator)
 		{
-			NetworkManager::HandleIncomingInputPackets(std::ref(unprocessedData), std::ref(joinerInputs)); // this way player 2's inputs don't just get squashed by player 1's world state being definitive
+			NetworkManager::HandleIncomingInputPackets(unprocessedData, std::ref(joinerInputs)); // this way player 2's inputs don't just get squashed by player 1's world state being definitive
 			gameWorld.Update(userIsCreator, std::ref(joinerInputs));
 			//ProcessWorldState();
 
@@ -191,7 +191,7 @@ int main(int argc, const char** argv)
 		{
 			//gameWorld.Update();
 			//ProcessWorldState();
-			NetworkManager::HandleIncomingWorldStatePackets(std::ref(gameWorld),listeningSocket, addressRecievedFrom);
+			NetworkManager::HandleIncomingWorldStatePackets(std::ref(gameWorld), unprocessedData);
 			NetworkManager::HandleOutgoingInputPackets(std::ref(joinerInputs), sendingSocket, addressToSendTo);
 		}
 
@@ -210,6 +210,9 @@ int main(int argc, const char** argv)
 
 	listeningThread.join();
 	SocketUtil::CleanUp();
+
+	unprocessedData->clear();
+	delete unprocessedData;
 
 	return 0;
 }

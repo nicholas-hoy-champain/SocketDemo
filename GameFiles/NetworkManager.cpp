@@ -36,13 +36,12 @@ void NetworkManager::SetUpInitialListening(int& port, UDPSocketPtr& listeningSoc
 	//if (listeningSocket->ReceiveFrom() != NO_ERROR)
 	//{
 	//	SocketUtil::ReportError("Error listening with the socket");
-	//	ExitProcess(1);
-	//}
+	//	ExitProcess(1);z
 
 	LOG("Your port is %i\n", static_cast<int>(port));
 	//LOG("%s", "socket is now listening");
 }
-void NetworkManager::HandleListening(bool& connectionsOpen, UDPSocketPtr& listeningSocket, SocketAddressPtr& addressRecievedFrom, vector<std::pair<int, void*>>& unprocessedData)
+void NetworkManager::HandleListening(bool& connectionsOpen, UDPSocketPtr& listeningSocket, SocketAddressPtr& addressRecievedFrom, vector<std::pair<int, void*>>* unprocessedData)
 {
 	std::cout << "Listening Now!";
 
@@ -53,14 +52,14 @@ void NetworkManager::HandleListening(bool& connectionsOpen, UDPSocketPtr& listen
 		char buffer[BUFFER_SIZE];
 		listeningSocket->ReceiveFrom(buffer, BUFFER_SIZE, *(addressRecievedFrom));
 
-		LOG("%s", "In handleListening after Recieve\n");
+		//LOG("%s", "In handleListening after Recieve\n");
 
 
 		if (buffer != nullptr)
 		{
 			string msgRecieved(static_cast<char*>(buffer), BUFFER_SIZE);
-			LOG("Recieved message: %s", msgRecieved.c_str());
-			unprocessedData.push_back(std::pair<int, void*>(time(0), buffer));
+			//LOG("Recieved message: %s", msgRecieved.c_str());
+			unprocessedData->push_back(std::pair<int, void*>(time(0), buffer));
 		}
 	}
 }
@@ -112,23 +111,24 @@ void NetworkManager::SetUpSending(int portToSendTo, int portUsedForSending, UDPS
 
 
 // updates
-bool NetworkManager::HandleIncomingInputPackets(vector<std::pair<int, void*>>& unprocessedData, vector<JoinerInput>& joinerInputs)
+bool NetworkManager::HandleIncomingInputPackets(vector<std::pair<int, void*>>* unprocessedData, vector<JoinerInput>& joinerInputs)
 {
 
 	std::cout << "Input count before = " << joinerInputs.size() << '\n';
 
-	for(std::pair<int, void*> dataPacket : unprocessedData)
+	for(std::pair<int, void*> dataPacket : *unprocessedData)
 	{
 		char buffer[BUFFER_SIZE]{ *(static_cast<char*>(dataPacket.second)) };
-		InputMemoryBitStream inStream = InputMemoryBitStream(buffer, BUFFER_SIZE * 8);
+		InputMemoryBitStream inStream = InputMemoryBitStream(buffer, BUFFER_SIZE);
 		JoinerInput::Read(inStream, joinerInputs);
 	}
 
-	if (unprocessedData.size() > 0)
+	if (unprocessedData->size() > 0)
 	{
 		std::cout << "Input count after = " << joinerInputs.size() << '\n';
-		unprocessedData.clear();
+		unprocessedData->clear();
 	}
+
 
 	return true;
 }
@@ -142,15 +142,25 @@ bool NetworkManager::HandleOutgoingWorldStatePackets(WorldState& gameWorld, UDPS
 }
 
 
-bool NetworkManager::HandleIncomingWorldStatePackets(WorldState& gameWorld, UDPSocketPtr& listeningSocket, SocketAddressPtr& addressRecievedFrom)
+bool NetworkManager::HandleIncomingWorldStatePackets(WorldState& gameWorld, vector<std::pair<int, void*>>* unprocessedDataPackets)
 {
-	//std::cout << "HandlingJoinerIncoming\n";
 
-	char buffer[BUFFER_SIZE];
-	InputMemoryBitStream stream = InputMemoryBitStream(buffer, BUFFER_SIZE*8);
-	listeningSocket->ReceiveFrom(buffer, BUFFER_SIZE, *(addressRecievedFrom));
+	for (std::pair<int, void*> dataPacket : *unprocessedDataPackets)
+	{
+		if (dataPacket.first > timeOfLastWorldState)// only the newest world state
+		{
+			timeOfLastWorldState = dataPacket.first;
 
-	gameWorld.Read(stream);
+			char* buffer = (char*)dataPacket.second;
+			InputMemoryBitStream inStream = InputMemoryBitStream(buffer, BUFFER_SIZE);
+			gameWorld.Read(inStream);
+		}
+	}
+
+	if (unprocessedDataPackets->size() > 0)
+	{
+		unprocessedDataPackets->clear();
+	}
 
 	return true;
 }
