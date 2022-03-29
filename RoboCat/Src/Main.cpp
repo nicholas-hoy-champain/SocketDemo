@@ -189,7 +189,7 @@ int main(int argc, const char** argv)
 		}
 		else
 		{
-			//gameWorld.Update();
+			gameWorld.Update(userIsCreator, std::ref(joinerInputs));
 			//ProcessWorldState();
 			NetworkManager::HandleIncomingWorldStatePackets(std::ref(gameWorld), unprocessedData);
 			NetworkManager::HandleOutgoingInputPackets(std::ref(joinerInputs), sendingSocket, addressToSendTo);
