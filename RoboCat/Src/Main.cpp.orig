@@ -16,10 +16,23 @@
 #include "GameFiles/WorldState.h"
 #include "GameFiles/NetworkManager.h"
 
+<<<<<<< HEAD
+#if _WIN32
+=======
+
 ///
 ///          TODO
-///  O 
+///  O - Synchronize game objects over a socket.
+///  O - Create a two-player networked game with shared world state.
+///  O - Use Memory Streams and different Packet Header types to synchronize the state between the two instances.
+///  O - At least 10 synchronized objects in the world at once.
+///  O - At least 3 different kinds of game objects.
+///  O - Involve creating and destroying objects, which is then synchronized between clients.
+///  O - Use TCP and UDP appropriately, (for deltas and world state respectively) 
+///    X - if using UDP, there is a chance of things arriving out of order, so note the time of last remote update and send the time of the update with it, discarding old ones
+///  X - when user wants to quit, set  closingConnections = true; (to clean things up)
 
+>>>>>>> main
 
 
 const float SCREEN_X = 1500;
@@ -59,11 +72,14 @@ int main(int argc, const char** argv)
 	SocketAddressPtr addressToSendTo;
 	SocketAddressPtr addressRecievedFrom;
 
-	vector<std::pair<int, void*>>* unprocessedData =  new vector<std::pair<int, void*>>();
+	vector<std::pair<int, void*>> unprocessedData = vector<std::pair<int, void*>>();
 
 	//--------------------- intialization window -------------------------------
 
 	SocketUtil::StaticInit();
+
+<<<<<<< HEAD
+=======
 
 	// instructions
 
@@ -101,7 +117,7 @@ int main(int argc, const char** argv)
 		{
 			Sleep(500); // wait 0.5 second
 			std::cout << '.';
-		} while (unprocessedData->size() < 1);
+		} while (unprocessedData.size() < 1);
 
 		std::cout << "\n Recieved an offer to start the game, now sending the reply to start their game.\n";
 		NetworkManager::SetUpSending(JOINER_PORT, CREATOR_PORT + 10, sendingSocket, addressToSendTo);
@@ -127,16 +143,16 @@ int main(int argc, const char** argv)
 		NetworkManager::SetUpInitialListening(listeningPort, listeningSocket, listeningAddress);
 
 		addressRecievedFrom = SocketAddressFactory::CreateIPv4FromString((NetworkManager::ACCEPT_ALL_ADDRESS + std::to_string( JOINER_PORT + 5)));
-		listeningThread = std::thread(NetworkManager::HandleListening, std::ref(connectionsOpen), listeningSocket, addressRecievedFrom, unprocessedData);
+		listeningThread = std::thread(NetworkManager::HandleListening, std::ref(connectionsOpen), listeningSocket, addressRecievedFrom, std::ref(unprocessedData));
 		do
 		{
 			Sleep(500); // wait 0.5 second
 			std::cout << '.';
-		} while (unprocessedData->size() < 1);
+		} while (unprocessedData.size() < 1);
 	}
 
 	// we don't need the starting messages stored
-	unprocessedData->clear();
+	unprocessedData.clear();
 
 	//  Graphics init
 	GraphicsLibrary gl(SCREEN_X, SCREEN_Y);
@@ -175,7 +191,7 @@ int main(int argc, const char** argv)
 
 		if (userIsCreator)
 		{
-			NetworkManager::HandleIncomingInputPackets(unprocessedData, std::ref(joinerInputs)); // this way player 2's inputs don't just get squashed by player 1's world state being definitive
+			NetworkManager::HandleIncomingInputPackets(std::ref(unprocessedData), std::ref(joinerInputs)); // this way player 2's inputs don't just get squashed by player 1's world state being definitive
 			gameWorld.Update(userIsCreator, std::ref(joinerInputs));
 			//ProcessWorldState();
 
@@ -183,9 +199,9 @@ int main(int argc, const char** argv)
 		}
 		else
 		{
-			gameWorld.Update(userIsCreator, std::ref(joinerInputs));
+			//gameWorld.Update();
 			//ProcessWorldState();
-			NetworkManager::HandleIncomingWorldStatePackets(std::ref(gameWorld), unprocessedData);
+			NetworkManager::HandleIncomingWorldStatePackets(std::ref(gameWorld),listeningSocket, addressRecievedFrom);
 			NetworkManager::HandleOutgoingInputPackets(std::ref(joinerInputs), sendingSocket, addressToSendTo);
 		}
 
@@ -203,10 +219,8 @@ int main(int argc, const char** argv)
 	connectionsOpen = false;
 
 	listeningThread.join();
+>>>>>>> main
 	SocketUtil::CleanUp();
-
-	unprocessedData->clear();
-	delete unprocessedData;
 
 	return 0;
 }

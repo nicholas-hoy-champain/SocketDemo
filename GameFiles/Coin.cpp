@@ -15,8 +15,8 @@ Coin::~Coin()
 {
 }
 
-void Coin::Update()
+void Coin::Update(WorldState* gameWorld)
 {
-	if (mGraphicsData.mX > 1500) mGraphicsData.mX = 0;
-	mGraphicsData.mX++;
+	//if (mGraphicsData.mX > 1500) mGraphicsData.mX = 0;
+	//mGraphicsData.mX++;
 }

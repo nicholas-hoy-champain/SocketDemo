@@ -14,21 +14,27 @@ WorldState::WorldState(GraphicsLibrary* gl)
 
 WorldState::~WorldState()
 {
-	delete mpGameObjectLinker;
+	ClearGameObjectsOut();
 	mpGraphicsLibrary = nullptr;
 }
 
-void WorldState::Update(bool isCreator, vector<JoinerInput>& joinerInput)
+void WorldState::Update(bool isCreator, vector<JoinerInput>& joinerInputs)
 {
 	if (isCreator)
 	{
-		// 
+		for (int i = 0; i < joinerInputs.size(); i++)
+		{
+			CreateKey(joinerInputs[i].location.x, joinerInputs[i].location.y);
+		}
+		joinerInputs.clear();
 	}
 
-	for each (GameObject* var in mGameObjects)
+	for(int i = 0; i < mGameObjects.size(); i++)
 	{
-		var->Update();
+		mGameObjects[i]->Update(this);
 	}
+
+	RemoveUnneededGameObjects();
 }
 
 void WorldState::Render()
@@ -51,9 +57,22 @@ void WorldState::CreateLock()
 void WorldState::CreateLock(int posX, int posY)
 {
 	GameObject* createdGameObject = Lock::CreateInstance();
-	createdGameObject->SetPostion(posX, posY);
+	createdGameObject->SetPostion(posX, 375); // quick fix so it's in middle
 	mpGameObjectLinker->GetNetworkId(createdGameObject,true);
 	mGameObjects.push_back(createdGameObject);
+}
+
+void WorldState::CreateKey(int posX, int posY)
+{
+	GameObject* createdGameObject = Key::CreateInstance();
+	createdGameObject->SetPostion(posX, 375); // quick fix so it's in the middle
+	mpGameObjectLinker->GetNetworkId(createdGameObject,true);
+	mGameObjects.push_back(createdGameObject);
+}
+
+void WorldState::SetForDestroy(GameObject* obj)
+{
+	mToDestroy.push_back(obj);
 }
 
 void WorldState::Write(OutputMemoryBitStream& stream) const
@@ -72,6 +91,9 @@ void WorldState::Write(OutputMemoryBitStream& stream) const
 
 void WorldState::Read(InputMemoryBitStream& stream)
 {
+	ClearGameObjectsOut();
+	mpGameObjectLinker = new LinkingContext();
+
 	int count;
 	uint32_t networkID;
 	uint32_t classID;
@@ -106,4 +128,62 @@ void WorldState::Read(InputMemoryBitStream& stream)
 		
 		tempObj->Read(stream);
 	}
+}
+
+void WorldState::ClearGameObjectsOut()
+{
+	while (!mGameObjects.empty())
+	{
+		GameObject* obj = mGameObjects.back();
+		switch (obj->GetClassId())
+		{
+		case 'LOCK':
+			delete (Lock*)obj;
+			break;
+		case 'KEYS':
+			delete (Key*)obj;
+			break;
+		case 'COIN':
+			delete (Coin*)obj;
+			break;
+		default:
+			break;
+		}
+		mGameObjects.pop_back();
+	}
+
+	delete mpGameObjectLinker;
+}
+
+void WorldState::RemoveUnneededGameObjects()
+{
+	for each(GameObject* obj in mToDestroy)
+	{
+		mpGameObjectLinker->RemoveGameObject(obj);
+		for (int i = 0; i < mGameObjects.size(); i++)
+		{
+			if (mGameObjects[i] == obj)
+			{
+				mGameObjects.erase(mGameObjects.begin() + i);
+				break;
+			}
+		}
+		
+		switch (obj->GetClassId())
+		{
+		case 'LOCK':
+			delete (Lock*)obj;
+			break;
+		case 'KEYS':
+			delete (Key*)obj;
+			break;
+		case 'COIN':
+			delete (Coin*)obj;
+			break;
+		default:
+			break;
+		}
+	}
+
+	mToDestroy.clear();
 }
